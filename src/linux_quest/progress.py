@@ -30,6 +30,26 @@ class Progress:
                         or not isinstance(saved.get("questions"), dict)
                         or not isinstance(saved.get("xp"), int)):
                     raise ValueError("지원하지 않는 저장 형식")
+                if (saved.get("difficulty") not in ("beginner", "intermediate", "advanced")
+                        or not isinstance(saved.get("exams"), list)
+                        or not isinstance(saved.get("clues"), list)
+                        or saved["xp"] < 0):
+                    raise ValueError("잘못된 진도 데이터")
+                for record in saved["missions"].values():
+                    if (not isinstance(record, dict)
+                            or not isinstance(record.get("completed"), bool)
+                            or not isinstance(record.get("solutions"), list)
+                            or not all(isinstance(record.get(k), int) and record[k] >= 0
+                                       for k in ("attempts", "max_hint", "skips"))
+                            or not isinstance(record.get("review_passed"), bool)):
+                        raise ValueError("잘못된 미션 기록")
+                current = saved.get("current")
+                if current is not None and (not isinstance(current, dict)
+                        or not isinstance(current.get("id"), str)
+                        or current.get("difficulty") not in ("beginner", "intermediate", "advanced")
+                        or current.get("variant") not in ("a", "b", "c")
+                        or not isinstance(current.get("hint"), int) or not 0 <= current["hint"] <= 3):
+                    raise ValueError("잘못된 이어하기 기록")
                 self.data.update(saved)
             except (ValueError, OSError, TypeError) as exc:
                 raise SaveError(f"저장 파일을 읽을 수 없습니다. 원본은 보존했습니다: {self.path}\n{exc}") from exc

@@ -165,8 +165,10 @@ class Game:
             if index + 1 < len(MISSIONS):
                 self.progress.data["cursor"] = MISSIONS[index+1].id
                 self.progress.save()
-        self.ui.print("\n[사건 해결] 다음 담당자를 위한 인계가 끝났습니다.\n"
-                      "건너뛴 미션과 오답은 복습 메뉴에서 이어갈 수 있습니다.")
+        finale_done = self.progress.data["missions"].get("10-finale", {}).get("completed", False)
+        self.ui.print("\n" + ("[사건 해결] 다음 담당자를 위한 인계가 끝났습니다." if finale_done else
+                      "마지막 구간에 도착했습니다. 최종 인계는 아직 미완료입니다.") +
+                      "\n건너뛴 미션과 오답은 복습 메뉴에서 이어갈 수 있습니다.")
         self.ui.pause()
 
     def practice_question(self, question, allow_hint=False):
@@ -275,7 +277,7 @@ class Game:
                                     return "reset"
                             elif command == "skip":
                                 self.progress.skip()
-                                self.ui.print("미완료로 남겼습니다. 챕터 선택에서 다시 도전할 수 있습니다.")
+                                self.ui.print("이번 시도를 건너뛰었습니다. 기존 완료 기록은 유지됩니다.")
                                 return "next"
                             elif command == "exit":
                                 return "exit"

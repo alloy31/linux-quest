@@ -1,12 +1,17 @@
 import base64
 import json
+import io
+import os
 import tempfile
 import unittest
+import time
+from unittest.mock import patch
 from pathlib import Path
 
 from linux_quest.model import Mission
 from linux_quest.progress import Progress, SaveError
 from linux_quest.runtime import EventDecoder
+from linux_quest.ui import UI
 
 
 class ProgressTests(unittest.TestCase):
@@ -56,6 +61,16 @@ class ProgressTests(unittest.TestCase):
             Progress(self.path)
         self.assertEqual(self.path.read_text(), "broken")
 
+    def test_parseable_but_invalid_save_is_not_overwritten(self):
+        self.progress.save()
+        value = json.loads(self.path.read_text())
+        value["current"] = {"id": "test", "difficulty": "advanced", "variant": "a", "hint": -1}
+        raw = json.dumps(value)
+        self.path.write_text(raw)
+        with self.assertRaises(SaveError):
+            Progress(self.path)
+        self.assertEqual(self.path.read_text(), raw)
+
 
 class ProtocolTests(unittest.TestCase):
     def test_events_can_cross_every_byte_boundary_without_losing_output(self):
@@ -73,6 +88,20 @@ class ProtocolTests(unittest.TestCase):
     def test_other_tokens_are_ordinary_terminal_output(self):
         output = b"\x1b]777;LQ;another;payload\x07"
         self.assertEqual(EventDecoder("mine").feed(output), [("output", output)])
+
+
+class DeadlineTests(unittest.TestCase):
+    def test_no_input_does_not_suspend_exam_clock(self):
+        reader, writer = os.pipe()
+        try:
+            with os.fdopen(reader) as stdin, patch("sys.stdin", stdin), patch("sys.stdout", io.StringIO()):
+                ui = UI()
+                start = time.monotonic()
+                with self.assertRaises(TimeoutError):
+                    ui.ask("answer", deadline=start + 0.03)
+                self.assertLess(time.monotonic() - start, 1)
+        finally:
+            os.close(writer)
 
 
 if __name__ == "__main__":

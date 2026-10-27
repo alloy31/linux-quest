@@ -1,5 +1,6 @@
 import base64
 import fcntl
+import hashlib
 import json
 import os
 import pty
@@ -34,17 +35,31 @@ def docker(*args, input=None, timeout=30, check=True):
     return result
 
 
+def image_fingerprint(root=ASSETS):
+    digest = hashlib.sha256()
+    for path in sorted(root.iterdir()):
+        if path.is_file() and not path.name.startswith("."):
+            digest.update(path.name.encode())
+            digest.update(b"\0")
+            digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
 def ensure_image(announce=print):
     if not shutil.which("docker"):
         raise LabError("Docker를 찾을 수 없습니다. Docker Desktop을 설치·실행한 후 다시 시작하세요.")
     docker("info", "--format", "{{.ServerVersion}}", timeout=10)
-    result = docker("image", "inspect", IMAGE, "--format",
-                    '{{index .Config.Labels "org.linux-quest.image-version"}}', check=False)
-    if result.returncode == 0 and result.stdout.strip() == "2026.1":
-        return
-    announce("첫 실습 환경을 준비합니다. 처음에는 이미지·패키지 다운로드가 필요합니다.")
+    fingerprint = image_fingerprint()
+    result = docker("image", "inspect", IMAGE, "--format", '{{json .Config.Labels}}', check=False)
+    if result.returncode == 0:
+        labels = json.loads(result.stdout) or {}
+        if (labels.get("org.linux-quest.image-version") == "2026.1" and
+                labels.get("org.linux-quest.source-hash") == fingerprint):
+            return
+    announce("실습 환경을 준비·갱신합니다. 첫 실행에는 이미지·패키지 다운로드가 필요합니다.")
     # Inherit output so a multi-minute first build has visible progress.
-    result = subprocess.run(["docker", "build", "-t", IMAGE, str(ASSETS)])
+    result = subprocess.run(["docker", "build", "-t", IMAGE, "--label",
+                             "org.linux-quest.source-hash=" + fingerprint, str(ASSETS)])
     if result.returncode:
         raise LabError("실습 이미지 준비에 실패했습니다. 네트워크와 Docker 상태를 확인해 주세요.")
 
@@ -113,6 +128,19 @@ class DockerLab:
                 "--network", self.netname if self.network else "none", "--memory", "512m",
                 "--cpus", "1", "--pids-limit", "128", "--hostname", "quest", IMAGE)
             self.created = True
+            if self.network:
+                readiness = """import socket, time
+for attempt in range(40):
+    try:
+        connection = socket.create_connection(('quest-vault', 8080), timeout=0.5)
+        connection.close()
+        break
+    except OSError:
+        time.sleep(0.1)
+else:
+    raise RuntimeError('Internal lab service did not start')
+"""
+                docker("exec", self.name, "python3", "-c", readiness, timeout=25)
             return self
         except BaseException:
             self.close()
@@ -195,7 +223,7 @@ class DockerLab:
                                             start_new_session=True)
             os.close(slave)
             slave = -1
-            tty.setraw(fd)
+            tty.setraw(fd, when=termios.TCSANOW)
             while True:
                 ready, _, _ = select.select([master, fd], [], [], 0.3)
                 if master in ready:
@@ -214,7 +242,7 @@ class DockerLab:
                         try:
                             action = handler(value, self)
                         finally:
-                            tty.setraw(fd)
+                            tty.setraw(fd, when=termios.TCSANOW)
                         if action:
                             return action
                 if fd in ready:
@@ -226,7 +254,7 @@ class DockerLab:
                         try:
                             action = handler({"command": "pause"}, self)
                         finally:
-                            tty.setraw(fd)
+                            tty.setraw(fd, when=termios.TCSANOW)
                         if action:
                             return action
                         os.write(master, b"\x0c")

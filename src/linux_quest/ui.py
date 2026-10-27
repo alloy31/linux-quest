@@ -21,7 +21,7 @@ def raw_input():
     fd = sys.stdin.fileno()
     old = termios.tcgetattr(fd)
     try:
-        tty.setraw(fd)
+        tty.setraw(fd, when=termios.TCSANOW)
         yield
     finally:
         termios.tcsetattr(fd, termios.TCSADRAIN, old)

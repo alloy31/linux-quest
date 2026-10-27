@@ -75,9 +75,10 @@ class Game:
                 return
             if choice == "start":
                 difficulty = self.difficulty()
-                self.ui.print("\n[첫 출근]\n당신은 기록 보관소의 신입 서버 관리자입니다.\n"
+                self.ui.page("첫 출근", "기록 보관소 · 사건의 시작")
+                self.ui.panel("도착한 메시지", "당신은 기록 보관소의 신입 서버 관리자입니다.\n"
                     "매일 02:00, 백업은 실패하고 인수인계 자료는 사라집니다.\n"
-                    "선임의 마지막 메시지부터 찾아봅시다.\n")
+                    "선임의 마지막 메시지부터 찾아봅시다.")
                 self.ui.ask("Enter: 시작 · s: 도입 건너뛰기 ")
                 self.campaign(0, difficulty)
             elif choice == "resume":
@@ -123,24 +124,27 @@ class Game:
                    for m in MISSIONS if m.chapter == number)
 
     def show_lessons(self, mission):
-        self.ui.print(f"\n[학습 브리핑 · {BASELINE}]")
+        self.ui.section("학습 브리핑")
+        self.ui.text(BASELINE, "muted")
         for topic in mission.topics:
             info = TOPICS[topic]
-            self.ui.print(f"\n{info.title}\n{info.lesson}")
+            self.ui.section(info.title, "strong")
+            self.ui.text(info.lesson, indent=2)
 
     def show_mission(self, mission, difficulty, variant):
-        self.ui.print(f"\n{'=' * 48}\n챕터 {mission.chapter} · {DIFFICULTIES[difficulty]} · "
-                      + ("종합 사건" if mission.boss else "미션"))
-        self.ui.print(f"[{mission.title}]\n{mission.story}\n")
-        self.ui.print("목표\n" + mission.objective.replace("{v}", variant))
-        if mission.kind != "scenario":
-            for condition in mission.conditions(difficulty, variant):
-                self.ui.print("  [ ] " + condition["label"])
+        self.ui.page(mission.title, f"챕터 {mission.chapter}/{len(CHAPTERS)} · {DIFFICULTIES[difficulty]} · "
+                     + ("종합 사건" if mission.boss else "미션") + f" {MISSIONS.index(mission)+1}/{len(MISSIONS)}")
+        self.ui.text(mission.story)
+        body = mission.objective.replace("{v}", variant)
+        conditions = mission.conditions(difficulty, variant)
+        if mission.kind != "scenario" and len(conditions) > 1:
+            body += "\n\n" + "\n".join("[ ] " + condition["label"] for condition in conditions)
+        self.ui.panel("이번 목표", body)
         if mission.prerequisites:
-            self.ui.print("권장 선수: " + ", ".join(MISSION_BY_ID[p].title for p in mission.prerequisites))
+            self.ui.text("권장 선수: " + ", ".join(MISSION_BY_ID[p].title for p in mission.prerequisites), "muted")
         if mission.kind in ("simulation", "scenario"):
-            self.ui.print("[모의 상황] 실제 설치·부팅·물리 장치·GUI 조작을 수행하지 않습니다.")
-        self.ui.print("\n" + BASELINE)
+            self.ui.text("[모의 상황] 실제 설치·부팅·물리 장치·GUI 조작을 수행하지 않습니다.", "warning")
+        self.ui.text(BASELINE, "muted")
 
     def choose_variant(self, mission):
         record = self.progress.data["missions"].get(mission.id, {})
@@ -171,35 +175,40 @@ class Game:
                       "\n건너뛴 미션과 오답은 복습 메뉴에서 이어갈 수 있습니다.")
         self.ui.pause()
 
-    def practice_question(self, question, allow_hint=False):
+    def practice_question(self, question, allow_hint=False, position=None, context=""):
         question = shuffle_choices(question)
         hint_used = False
-        self.ui.print(f"\n[확인 문제 · {TOPICS[question.topic].title}]\n{question.stem}")
-        for i, label in enumerate(question.choices, 1):
-            self.ui.print(f"  {i}. {label}")
+        meta = f"문제 {position[0]}/{position[1]}" if position else "개념 확인"
+        if context:
+            meta += " · " + context
+        self.ui.page(f"[확인 문제 · {TOPICS[question.topic].title}]", meta)
+        self.ui.panel("문제", question.stem)
+        self.ui.choices(question.choices)
         while True:
             answer = self.ui.ask("답 1~4" + (" · h 힌트" if allow_hint else "") + " · s 해설 보기: ")
             if allow_hint and answer == "h":
                 hint_used = True
                 level = self.progress.hint()
-                self.ui.print(f"[힌트 {level}/3] " + (
+                self.ui.panel(f"[힌트 {level}/3]", (
                     f"{TOPICS[question.topic].title}에서 각 용어의 역할을 구별하세요." if level == 1 else
                     TOPICS[question.topic].lesson if level == 2 else
-                    f"정답: {question.choices[question.answer]}\n{question.explanation}"))
+                    f"정답: {question.choices[question.answer]}\n{question.explanation}"), "hint")
                 continue
             if answer in ("1", "2", "3", "4", "s"):
                 break
         correct = answer != "s" and int(answer)-1 == question.answer
         self.progress.answer(question, correct)
-        self.ui.print(("✓ 정답" if correct else "다시 확인할 개념") +
-                      f" · 정답 {question.answer+1}. {question.choices[question.answer]}\n{question.explanation}")
+        self.ui.panel("✓ 정답" if correct else "다시 확인할 개념",
+                      f"정답 {question.answer+1}. {question.choices[question.answer]}\n{question.explanation}",
+                      "success" if correct else "warning")
         return correct, hint_used
 
     def scenario(self, mission, difficulty, variant):
         if difficulty == "beginner":
             self.show_lessons(mission)
         else:
-            self.ui.print("답변 중 h로 브리핑을 확인할 수 있습니다.")
+            self.ui.text("답변 중 h로 브리핑을 확인할 수 있습니다.", "muted")
+        self.ui.pause("Enter를 누르면 확인 문제를 시작합니다.")
         per_topic = {"beginner": 1, "intermediate": 2, "advanced": 3}[difficulty]
         selected = []
         for topic in mission.topics:
@@ -208,16 +217,20 @@ class Game:
             rotation = mission.variants.index(variant)
             selected.extend([pool[(rotation + j) % len(pool)] for j in range(min(per_topic, len(pool)))])
         wrong = []
-        for q in selected:
-            correct, _ = self.practice_question(q, allow_hint=True)
+        for index, q in enumerate(selected, 1):
+            if index > 1:
+                self.ui.pause("Enter를 누르면 다음 문제로 이동합니다.")
+            correct, _ = self.practice_question(q, allow_hint=True,
+                position=(index, len(selected)), context=mission.title)
             if not correct:
                 wrong.append(q)
         if wrong:
             self.ui.print("\n틀린 개념을 다시 확인합니다. 이 시도는 안내를 받은 해결로 기록합니다.")
             self.progress.hint()
-            for q in wrong:
-                while not self.practice_question(q)[0]:
-                    self.ui.print("브리핑과 해설을 보고 다시 선택하세요.")
+            for index, q in enumerate(wrong, 1):
+                self.ui.pause("Enter를 누르면 틀린 문제에 다시 도전합니다.")
+                while not self.practice_question(q, position=(index, len(wrong)), context="오답 다시 풀기")[0]:
+                    self.ui.pause("브리핑과 해설을 보고 Enter를 누르면 다시 도전합니다.")
         self.progress.complete(mission)
         return self.after_mission(mission)
 
@@ -225,11 +238,10 @@ class Game:
         index = MISSIONS.index(mission)
         self.progress.data["cursor"] = MISSIONS[index+1].id if index+1 < len(MISSIONS) else None
         self.progress.save()
-        self.ui.print("\n✓ 미션 완료 · " + self.progress.rank())
-        if mission.debrief:
-            self.ui.print(mission.debrief)
+        self.ui.panel("✓ 미션 완료", self.progress.rank() + ("\n" + mission.debrief if mission.debrief else ""), "success")
         if mission.clue:
-            self.ui.print("[사건 기록] " + mission.clue)
+            self.ui.section("사건 기록", "hint")
+            self.ui.text(mission.clue, indent=2)
         if self.chapter_count(mission.chapter) == 4:
             self.ui.print("[구역 복구] " + CHAPTERS[mission.chapter][1])
         value = self.ui.ask("\nEnter를 누르면 다음 미션 · r 재도전 · m 메인 메뉴: ")
@@ -247,15 +259,15 @@ class Game:
                 action = self.scenario(mission, difficulty, variant)
             else:
                 if difficulty == "beginner":
-                    self.ui.print("\n배우기\n" + TUTORIALS.get(mission.id, "quest lesson으로 개념을 확인하세요."))
-                    self.ui.print("\n명령 예시\n" + mission.example.replace("{v}", variant))
-                self.ui.print("\nquest mission · hint · check · reset · skip · exit · lesson\n"
-                    "게임 메뉴: Ctrl+] · 명령 실행은 실제 Linux 안에서 진행됩니다.\n")
+                    self.ui.commands(TUTORIALS.get(mission.id, "quest lesson으로 개념을 확인하세요."))
+                    self.ui.panel("명령 예시", mission.example.replace("{v}", variant), "command", code=True)
+                self.ui.lab_help()
+                self.ui.print()
                 try:
                     if not self.image_ready:
                         ensure_image(self.ui.print)
                         self.image_ready = True
-                    with DockerLab(mission.network) as lab:
+                    with DockerLab(mission.network, color=self.ui.color) as lab:
                         lab.setup(mission.setup.replace("{v}", variant))
                         first_prompt = True
                         previous_unmet = None
@@ -271,7 +283,8 @@ class Game:
                                     self.show_lessons(mission)
                                 else:
                                     level = self.progress.hint()
-                                    self.ui.print(f"\n[힌트 {level}/3]\n" + mission.hints[level-1].replace("{v}", variant))
+                                    self.ui.panel(f"[힌트 {level}/3]", mission.hints[level-1].replace("{v}", variant),
+                                                  "hint", code=level == 3)
                             elif command == "reset":
                                 if self.ui.ask("실습 파일을 초기화할까요? 완료 기록은 유지됩니다. [y/N] ").lower() == "y":
                                     return "reset"
@@ -290,23 +303,25 @@ class Game:
                                 if selected != "continue":
                                     return selected
                             elif command == "help":
-                                self.ui.print("quest mission | hint | check | reset | skip | exit | answer 답 | lesson")
+                                self.ui.lab_help()
+                                self.ui.text("조사 답변 quest answer 값 · 개념 보기 quest lesson", "muted", indent=2)
                             if command not in ("_prompt", "check", "answer"):
                                 return None
                             result = active.check(mission.conditions(difficulty, variant))
                             if result.success:
-                                self.ui.print("\n✓ 모든 완료 조건을 충족했습니다.")
+                                self.ui.text("\n✓ 모든 완료 조건을 충족했습니다.", "success")
                                 self.progress.complete(mission)
                                 pool = [q for q in QUESTIONS if q.id in MISSION_QUESTIONS.get(mission.id, ())]
                                 if not pool:
                                     pool = [q for q in QUESTIONS if q.topic in mission.topics]
-                                for q in random.sample(pool, min(2 if mission.boss else 1, len(pool))):
-                                    self.practice_question(q)
+                                selected = random.sample(pool, min(2 if mission.boss else 1, len(pool)))
+                                for index, q in enumerate(selected, 1):
+                                    if index > 1:
+                                        self.ui.pause("Enter를 누르면 다음 문제로 이동합니다.")
+                                    self.practice_question(q, position=(index, len(selected)), context="✓ 실습 완료")
                                 return self.after_mission(mission)
                             if command == "check" or (not first_prompt and previous_unmet != result.unmet):
-                                self.ui.print("\n남은 조건")
-                                for label in result.unmet:
-                                    self.ui.print("  [ ] " + label)
+                                self.ui.panel("남은 조건", "\n".join("[ ] " + label for label in result.unmet), "warning")
                             first_prompt = False
                             previous_unmet = result.unmet
                             return None
@@ -347,8 +362,10 @@ class Game:
                 if mid:
                     self.play(MISSION_BY_ID[mid], self.difficulty(), review=True)
         elif choice == "questions":
-            for q in wrong:
-                self.practice_question(q)
+            for index, q in enumerate(wrong, 1):
+                if index > 1:
+                    self.ui.pause("Enter를 누르면 다음 문제로 이동합니다.")
+                self.practice_question(q, position=(index, len(wrong)), context="오답 복습")
             if not wrong:
                 self.ui.print("현재 오답이 없습니다.")
         if choice != "back":
@@ -384,7 +401,8 @@ class Game:
     def exam(self, stage):
         questions = select_exam(stage)
         duration = (60 if stage == 1 else 100) * 60
-        self.ui.print(f"\n{stage}차 모의시험 · {len(questions)}문항 · {duration//60}분 · 자체 제작\n"
+        self.ui.page(f"{stage}차 모의시험", "자체 제작 문제 · 2026")
+        self.ui.panel("시험 안내", f"{len(questions)}문항 · {duration//60}분\n"
             "답 1~4 · n 다음 · p 이전 · s 제출\n합격: 총점 60점 이상" +
             (" + 각 과목 40% 이상" if stage == 2 else ""))
         self.ui.pause("Enter를 누르면 타이머가 시작됩니다.")
@@ -394,12 +412,13 @@ class Game:
             while True:
                 q = questions[index]
                 remaining = max(0, int(deadline - time.monotonic()))
-                self.ui.print(f"\n[{index+1}/{len(questions)}] 남은 시간 {remaining//60}:{remaining%60:02} · "
-                              f"답변 {len(answers)}개\n{q.stem}")
-                for i, label in enumerate(q.choices, 1):
-                    self.ui.print(f"  {i}. {label}")
+                self.ui.page(f"{stage}차 모의시험 · [{index+1}/{len(questions)}]",
+                    f"남은 시간 {remaining//60}:{remaining%60:02} · 답변 {len(answers)}개")
+                self.ui.panel("문제", q.stem)
+                self.ui.choices(q.choices)
                 if index in answers:
-                    self.ui.print(f"현재 답: {answers[index]+1}")
+                    self.ui.text(f"현재 답: {answers[index]+1}", "command")
+                self.ui.text("1~4 답변 · n 다음 · p 이전 · s 제출", "muted")
                 answer = self.ui.ask("선택: ", deadline=deadline)
                 if answer == "s":
                     break
@@ -422,8 +441,10 @@ class Game:
         for i, q in enumerate(questions):
             if i in answers:
                 self.progress.answer(q, answers[i] == q.answer)
-        self.ui.print(f"\n[모의시험 결과] {result['score']}점 · {result['correct']}/{result['total']}\n" +
-                      ("합격 기준 충족" if result["passed"] else "합격 기준 미충족"))
+        self.ui.page("[모의시험 결과]", f"{stage}차 · 자체 제작")
+        self.ui.panel("합격 기준 충족" if result["passed"] else "합격 기준 미충족",
+                      f"{result['score']}점 · {result['correct']}/{result['total']}",
+                      "success" if result["passed"] else "warning")
         if status != "submitted":
             self.ui.print("시간 종료" if status == "timed_out" else "중단한 시험 · 미응답은 오답으로 채점")
         for section, value in result["sections"].items():
@@ -448,8 +469,9 @@ def main():
     parser.add_argument("--mission", choices=list(MISSION_BY_ID), help="지정 미션으로 바로 시작")
     parser.add_argument("--difficulty", choices=list(DIFFICULTIES), default="beginner")
     parser.add_argument("--exam", type=int, choices=(1, 2), help="모의시험 바로 시작")
+    parser.add_argument("--color", choices=("auto", "always", "never"), default="auto", help="색상 표시 방식")
     args = parser.parse_args()
-    ui = UI()
+    ui = UI(color=args.color)
     if args.check_content:
         errors = content_errors()
         ui.print(f"{len(CHAPTERS)}개 챕터 · {len(MISSIONS)}개 미션 · {len(TOPICS)}개 개념 · {len(QUESTIONS)}개 자체 제작 문항")

@@ -79,6 +79,39 @@ class Terminal:
 
 
 class MenuTerminalTests(unittest.TestCase):
+    def test_question_pages_wait_for_explanation_acknowledgement_before_clearing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            terminal = Terminal(tmp, "--mission", "01-foundations", "--difficulty", "beginner")
+            try:
+                terminal.expect("Enter를 누르면 확인 문제를 시작합니다.")
+                terminal.send("\r")
+                first = terminal.expect("문제 1/4")
+                self.assertIn("\033[2J\033[H", first)
+                terminal.expect("s 해설 보기:")
+                terminal.send("s\r")
+                feedback = terminal.expect("Enter를 누르면 다음 문제로 이동합니다.")
+                self.assertIn("다시 확인할 개념", feedback)
+                self.assertNotIn("\033[2J\033[H", feedback)
+                self.assertNotIn("문제 2/4", feedback)
+                terminal.send("\r")
+                second = terminal.expect("문제 2/4")
+                self.assertIn("\033[2J\033[H", second)
+                terminal.expect("s 해설 보기:")
+            finally:
+                terminal.close()
+
+    def test_force_color_displays_style_when_no_color_is_inherited(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            terminal = Terminal(tmp, "--color", "always")
+            try:
+                screen = terminal.expect("숫자+Enter")
+                self.assertIn("\033[1;36m", screen)
+                terminal.send("4\r")
+                terminal.expect("다음 점검 때 만나요")
+                self.assertEqual(terminal.wait(), 0)
+            finally:
+                terminal.close()
+
     def test_mock_exam_navigation_revision_and_early_submission(self):
         for stage, total in ((1, 50), (2, 80)):
             with self.subTest(stage=stage), tempfile.TemporaryDirectory() as tmp:
@@ -89,7 +122,8 @@ class MenuTerminalTests(unittest.TestCase):
                     terminal.expect(f"[1/{total}]")
                     terminal.expect("선택:")
                     terminal.send("1\r")
-                    terminal.expect(f"[2/{total}]")
+                    next_page = terminal.expect(f"[2/{total}]")
+                    self.assertIn("\033[2J\033[H", next_page)
                     terminal.expect("선택:")
                     terminal.send("p\r")
                     terminal.expect("현재 답: 1")
@@ -177,7 +211,12 @@ class GameTerminalTests(unittest.TestCase):
                 terminal.expect("s 해설 보기:")
                 terminal.send("s\r")
                 terminal.expect("m 메인 메뉴:")
-                terminal.send("m\r")
+                terminal.send("\r")
+                next_mission = terminal.expect("닫힌 서랍의 목록")
+                self.assertIn("\033[2J\033[H", next_mission)
+                self.assertNotIn("첫 출근 — 인수인계 자료 찾기", next_mission)
+                terminal.expect("learner@quest:~$")
+                terminal.send("quest exit\r")
                 terminal.expect("숫자+Enter")
                 saved = json.loads((Path(tmp) / "progress.json").read_text())
                 self.assertTrue(saved["missions"]["01-arrival"]["completed"])

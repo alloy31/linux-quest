@@ -105,9 +105,10 @@ class EventDecoder:
 
 
 class DockerLab:
-    def __init__(self, network=False):
+    def __init__(self, network=False, color=None):
         self.name = "linux-quest-" + secrets.token_hex(6)
         self.network = network
+        self.color = color
         self.netname = self.name + "-net"
         self.sidecar = self.name + "-vault"
         self.token = secrets.token_hex(16)
@@ -216,7 +217,7 @@ else:
             signal.signal(signal.SIGWINCH, resize)
             args = ["docker", "exec", "-it", "--user", "learner", "-e", "LQ_TOKEN=" + self.token,
                     "-e", "TERM=" + os.environ.get("TERM", "xterm-256color")]
-            if "NO_COLOR" in os.environ:
+            if self.color is False or (self.color is None and "NO_COLOR" in os.environ):
                 args += ["-e", "NO_COLOR=1"]
             args += [self.name, "bash", "--noprofile", "--rcfile", "/opt/quest/bashrc", "-i"]
             self.process = subprocess.Popen(args, stdin=slave, stdout=slave, stderr=slave,

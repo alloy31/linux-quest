@@ -198,6 +198,10 @@ PYTHONPATH=src python3 -m unittest discover -s tests -v
 학습 기준은 [KAIT 시험 안내·출제기준](https://www.ihd.or.kr/introducesubject1.do)입니다.
 2027년 이후 시험에는 변경된 출제 환경을 별도로 확인해야 합니다.
 
+## 라이선스
+
+[MIT License](LICENSE)로 공개합니다.
+
 ---
 
 made by **alloy**

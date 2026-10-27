@@ -67,8 +67,14 @@ def raw_input():
 
 
 class UI:
-    def __init__(self, color="always"):
+    def __init__(self, color="always", width="auto", clear_pages=True):
         self.interactive = sys.stdin.isatty() and sys.stdout.isatty() and os.environ.get("TERM") != "dumb"
+        self.set_color(color)
+        self.width_limit = 80 if width == "auto" else int(width)
+        self.clear_pages = clear_pages
+
+    def set_color(self, color):
+        self.color_mode = color
         self.color = color == "always" or (color == "auto" and self.interactive and "NO_COLOR" not in os.environ)
 
     def print(self, text=""):
@@ -77,7 +83,7 @@ class UI:
     @property
     def width(self):
         # Leave room for the terminal's last column, which can trigger an unwanted wrap.
-        return max(8, min(80, shutil.get_terminal_size((80, 24)).columns - 2))
+        return max(8, min(self.width_limit, shutil.get_terminal_size((80, 24)).columns - 2))
 
     def paint(self, text, tone="accent"):
         return f"\033[{PALETTE[tone]}m{text}\033[0m" if self.color else text
@@ -87,8 +93,9 @@ class UI:
             print("\033[2J\033[H", end="", flush=True)
 
     def page(self, title, meta=""):
-        self.clear()
-        if not self.interactive:
+        if self.clear_pages:
+            self.clear()
+        if not self.interactive or not self.clear_pages:
             self.print("\n" + "─" * self.width)
         if meta:
             self.text(meta, "muted")
@@ -161,12 +168,13 @@ class UI:
         self.text("리눅스마스터 2급 · 2026 · Rocky Linux 8", "muted")
         self.print()
 
-    def menu(self, title, entries, disabled=(), banner=False):
+    def menu(self, title, entries, disabled=(), banner=False, default=None):
         """Entries are (value, label). Numbers followed by Enter also work."""
         enabled = [i for i, (key, _) in enumerate(entries) if key not in disabled]
         if not enabled:
             raise ValueError("활성 메뉴 없음")
-        selected, digits = enabled[0], ""
+        selected = next((i for i in enabled if entries[i][0] == default), enabled[0])
+        digits = ""
         if not self.interactive:
             if banner:
                 self.title()

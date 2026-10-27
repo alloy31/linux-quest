@@ -79,6 +79,60 @@ class Terminal:
 
 
 class MenuTerminalTests(unittest.TestCase):
+    def test_startup_settings_save_and_apply_on_the_next_launch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            terminal = Terminal(tmp, color=None)
+            try:
+                terminal.expect("숫자+Enter")
+                terminal.send("4\r")
+                terminal.expect("설정 · 변경하면 바로 저장됩니다")
+                terminal.expect("숫자+Enter")
+                terminal.send("1\r")
+                terminal.expect("컬러 표시")
+                terminal.expect("숫자+Enter")
+                terminal.send("2\r")
+                terminal.expect("컬러 표시 · 컬러 끄기")
+                terminal.expect("숫자+Enter")
+                terminal.send("2\r")
+                terminal.expect("기본 난이도")
+                terminal.expect("숫자+Enter")
+                terminal.send("3\r")
+                terminal.expect("기본 난이도 · 고급")
+                terminal.expect("숫자+Enter")
+                terminal.send("7\r")
+                terminal.expect("숫자+Enter")
+                terminal.send("5\r")
+                terminal.expect("다음 점검 때 만나요")
+                self.assertEqual(terminal.wait(), 0)
+            finally:
+                terminal.close()
+            settings = json.loads((Path(tmp) / "settings.json").read_text())
+            self.assertEqual(settings["color"], "never")
+            self.assertEqual(settings["difficulty"], "advanced")
+            resumed = Terminal(tmp, color=None)
+            try:
+                screen = resumed.expect("숫자+Enter")
+                self.assertNotRegex(screen, r"\x1b\[[0-9;]*m")
+                resumed.send("\r")
+                resumed.expect("> 3. 고급")
+            finally:
+                resumed.close()
+
+    def test_cli_color_override_does_not_change_saved_preferences(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            from linux_quest.settings import Settings
+            path = Path(tmp) / "settings.json"
+            Settings(path).set("color", "never")
+            terminal = Terminal(tmp, "--color", "always", color=None)
+            try:
+                self.assertIn("\033[1;36m", terminal.expect("숫자+Enter"))
+                terminal.send("5\r")
+                terminal.expect("다음 점검 때 만나요")
+                self.assertEqual(terminal.wait(), 0)
+            finally:
+                terminal.close()
+            self.assertEqual(Settings(path).data["color"], "never")
+
     def test_question_pages_wait_for_explanation_acknowledgement_before_clearing(self):
         with tempfile.TemporaryDirectory() as tmp:
             terminal = Terminal(tmp, "--mission", "01-foundations", "--difficulty", "beginner")
@@ -106,7 +160,7 @@ class MenuTerminalTests(unittest.TestCase):
             try:
                 screen = terminal.expect("숫자+Enter")
                 self.assertIn("\033[1;36m", screen)
-                terminal.send("4\r")
+                terminal.send("5\r")
                 terminal.expect("다음 점검 때 만나요")
                 self.assertEqual(terminal.wait(), 0)
             finally:
@@ -167,7 +221,7 @@ class MenuTerminalTests(unittest.TestCase):
                 transcript = terminal.expect("숫자+Enter")
                 self.assertIn("[ LINUX QUEST ]", transcript)
                 self.assertNotIn("Q U E S T", transcript)
-                terminal.send("4\r")
+                terminal.send("5\r")
                 terminal.expect("다음 점검 때 만나요")
                 terminal.wait(timeout=5)
             finally:
@@ -222,7 +276,7 @@ class GameTerminalTests(unittest.TestCase):
                 self.assertTrue(saved["missions"]["01-arrival"]["completed"])
                 self.assertEqual(saved["xp"], 30)
                 self.assertEqual(saved["cursor"], "01-observe")
-                terminal.send("4\r")
+                terminal.send("5\r")
                 terminal.expect("다음 점검 때 만나요")
                 terminal.wait(timeout=5)
             finally:
@@ -239,7 +293,7 @@ class GameTerminalTests(unittest.TestCase):
                 resumed.expect("숫자+Enter")
                 resumed.send("3\r")
                 resumed.expect("숫자+Enter")
-                resumed.send("4\r")
+                resumed.send("5\r")
                 resumed.expect("다음 점검 때 만나요")
                 resumed.wait(timeout=5)
             finally:

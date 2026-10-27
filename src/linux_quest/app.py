@@ -15,6 +15,7 @@ from .progress import Progress, SaveError, default_path
 from .questions import QUESTIONS
 from .runtime import DockerLab, LabError, docker, ensure_image
 from .ui import UI
+from .settings import LABELS, OPTIONS, Settings, SettingsError
 from .tutorials import MISSION_QUESTIONS, TUTORIALS
 
 
@@ -53,23 +54,59 @@ def content_errors():
 
 
 class Game:
-    def __init__(self, ui, progress):
+    def __init__(self, ui, progress, settings):
         self.ui = ui
         self.progress = progress
+        self.settings = settings
         self.image_ready = False
 
     def difficulty(self):
         return self.ui.menu("난이도를 선택하세요", [(key, value + " — " + info) for key, value, info in (
             ("beginner", "초급", "개념·명령어와 함께"),
             ("intermediate", "중급", "목표부터, 필요하면 힌트"),
-            ("advanced", "고급", "여러 조건을 조합하는 사건"))])
+            ("advanced", "고급", "여러 조건을 조합하는 사건"))], default=self.settings.data["difficulty"])
+
+    def apply_setting(self, key):
+        value = self.settings.data[key]
+        if key == "color":
+            self.ui.set_color(value)
+        elif key == "width":
+            self.ui.width_limit = 80 if value == "auto" else int(value)
+        elif key == "clear_pages":
+            self.ui.clear_pages = value
+
+    def settings_menu(self):
+        while True:
+            entries = []
+            for key, label in LABELS.items():
+                value = self.ui.color_mode if key == "color" else self.settings.data[key]
+                entries.append((key, f"{label} · {dict(OPTIONS[key])[value]}"))
+            choice = self.ui.menu("설정 · 변경하면 바로 저장됩니다", entries +
+                [("reset", "기본 설정으로 복원"), ("back", "돌아가기")])
+            if choice == "back":
+                return
+            if choice == "reset":
+                if self.ui.menu("설정만 복원합니다 · 학습 진도는 유지됩니다", [
+                        ("back", "돌아가기"), ("reset", "기본 설정 복원")]) == "reset":
+                    self.settings.reset()
+                    for key in OPTIONS:
+                        self.apply_setting(key)
+                continue
+            current = self.ui.color_mode if choice == "color" else self.settings.data[choice]
+            options = [(str(index), label + (" · 현재" if value == current else ""))
+                       for index, (value, label) in enumerate(OPTIONS[choice])]
+            default = str(next(i for i, (value, _) in enumerate(OPTIONS[choice]) if value == current))
+            selected = self.ui.menu(LABELS[choice], options + [("back", "돌아가기")], default=default)
+            if selected != "back":
+                self.settings.set(choice, OPTIONS[choice][int(selected)][0])
+                self.apply_setting(choice)
 
     def main(self):
         while True:
             resumable = self.progress.data["current"] or self.progress.data["cursor"]
             choice = self.ui.menu("기록 보관소에 오신 것을 환영합니다", [
                 ("start", "시작하기"), ("resume", "이어하기"), ("learn", "학습 메뉴"),
-                ("exit", "종료")], disabled=() if resumable else ("resume",), banner=True)
+                ("settings", "설정"), ("exit", "종료")], disabled=() if resumable else ("resume",), banner=True)
             if choice == "exit":
                 self.ui.print("진도는 저장되어 있습니다. 다음 점검 때 만나요.")
                 return
@@ -92,6 +129,8 @@ class Game:
                     self.campaign(next(i for i, m in enumerate(MISSIONS) if m.id == mid),
                                   current["difficulty"] if current else self.progress.data["difficulty"],
                                   resume=current)
+            elif choice == "settings":
+                self.settings_menu()
             else:
                 self.learn_menu()
 
@@ -259,6 +298,8 @@ class Game:
                 action = self.scenario(mission, difficulty, variant)
             else:
                 if difficulty == "beginner":
+                    if self.settings.data["briefing"] == "detailed":
+                        self.show_lessons(mission)
                     self.ui.commands(TUTORIALS.get(mission.id, "quest lesson으로 개념을 확인하세요."))
                     self.ui.panel("명령 예시", mission.example.replace("{v}", variant), "command", code=True)
                 self.ui.lab_help()
@@ -467,11 +508,18 @@ def main():
     parser.add_argument("--list", action="store_true", help="챕터·미션 목록")
     parser.add_argument("--check-content", action="store_true", help="출제 범위·콘텐츠 검사")
     parser.add_argument("--mission", choices=list(MISSION_BY_ID), help="지정 미션으로 바로 시작")
-    parser.add_argument("--difficulty", choices=list(DIFFICULTIES), default="beginner")
+    parser.add_argument("--difficulty", choices=list(DIFFICULTIES), help="난이도 (기본: 저장된 설정)")
     parser.add_argument("--exam", type=int, choices=(1, 2), help="모의시험 바로 시작")
-    parser.add_argument("--color", choices=("auto", "always", "never"), default="always", help="색상 표시 방식 (기본: always)")
+    parser.add_argument("--color", choices=("auto", "always", "never"), help="이번 실행의 색상 표시 (기본: 저장된 설정, 최초 컬러)")
     args = parser.parse_args()
-    ui = UI(color=args.color)
+    path = args.data_dir / "progress.json" if args.data_dir else default_path()
+    try:
+        settings = Settings(path.parent / "settings.json")
+    except SettingsError as exc:
+        print(exc)
+        raise SystemExit(1)
+    ui = UI(color=args.color or settings.data["color"], width=settings.data["width"],
+            clear_pages=settings.data["clear_pages"])
     if args.check_content:
         errors = content_errors()
         ui.print(f"{len(CHAPTERS)}개 챕터 · {len(MISSIONS)}개 미션 · {len(TOPICS)}개 개념 · {len(QUESTIONS)}개 자체 제작 문항")
@@ -497,7 +545,6 @@ def main():
         except LabError as exc:
             ui.print(str(exc))
             raise SystemExit(1)
-    path = args.data_dir / "progress.json" if args.data_dir else default_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     # One writer per save directory; a second terminal must not silently lose progress.
     with (path.parent / ".progress.lock").open("a+") as lock:
@@ -507,16 +554,16 @@ def main():
             ui.print("같은 진도로 실행 중인 게임이 있습니다. 다른 창을 종료하거나 --data-dir로 구분하세요.")
             raise SystemExit(1)
         try:
-            game = Game(ui, Progress(path))
+            game = Game(ui, Progress(path), settings)
             if args.mission:
-                game.play(MISSION_BY_ID[args.mission], args.difficulty)
+                game.play(MISSION_BY_ID[args.mission], args.difficulty or settings.data["difficulty"])
             elif args.exam:
                 game.exam(args.exam)
             else:
                 game.main()
         except (EOFError, KeyboardInterrupt):
             ui.print("\n종료합니다. 미완료 미션은 다음 실행에서 초기 상태로 재개됩니다.")
-        except (SaveError, OSError) as exc:
+        except (SaveError, SettingsError, OSError) as exc:
             ui.print(f"\n진행을 중단했습니다: {exc}")
             raise SystemExit(1)
 

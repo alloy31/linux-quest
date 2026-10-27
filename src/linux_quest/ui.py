@@ -19,7 +19,7 @@ BANNER = r""" _     ___ _   _ _   ___  __
 
 ANSI = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 PALETTE = {"accent": "1;36", "command": "1;33", "hint": "1;35", "success": "1;32",
-           "warning": "1;33", "muted": "2", "strong": "1", "selected": "1;36"}
+           "warning": "1;33", "muted": "2", "strong": "1", "selected": "1;36", "credit": "90"}
 
 
 def cell_width(text):
@@ -164,7 +164,9 @@ class UI:
     def title(self):
         self.clear()
         width, height = shutil.get_terminal_size((80, 24))
-        self.print(self.paint(BANNER if width >= 42 and height >= 20 else "[ LINUX QUEST ]", "accent"))
+        banner = BANNER if width >= 42 and height >= 20 else "[ LINUX QUEST ]"
+        self.print(self.paint(banner, "accent"))
+        self.print(self.paint("made by alloy".center(max(cell_width(line) for line in banner.splitlines())), "credit"))
         self.text("리눅스마스터 2급 · 2026 · Rocky Linux 8", "muted")
         self.print()
 

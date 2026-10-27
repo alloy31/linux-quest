@@ -160,6 +160,7 @@ class MenuTerminalTests(unittest.TestCase):
             try:
                 screen = terminal.expect("숫자+Enter")
                 self.assertIn("\033[1;36m", screen)
+                self.assertRegex(screen, r"\x1b\[90m\s*made by alloy")
                 terminal.send("5\r")
                 terminal.expect("다음 점검 때 만나요")
                 self.assertEqual(terminal.wait(), 0)
@@ -206,6 +207,7 @@ class MenuTerminalTests(unittest.TestCase):
             try:
                 transcript = terminal.expect("숫자+Enter")
                 self.assertIn("Q U E S T", transcript)
+                self.assertIn("made by alloy", transcript)
                 self.assertIn("이어하기 (기록 없음)", transcript)
                 # A pasted arrow sequence plus Enter must not be discarded by raw-mode setup.
                 terminal.send(b"\x1b[A\r")

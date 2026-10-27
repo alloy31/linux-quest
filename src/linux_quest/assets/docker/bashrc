@@ -1,0 +1,7 @@
+export PS1='\[\033[36m\]learner@quest\[\033[0m\]:\w\$ '
+[[ -n "${NO_COLOR+x}" ]] && export PS1='learner@quest:\w\$ '
+export HISTFILE=/home/learner/.bash_history
+export HISTSIZE=500
+PROMPT_COMMAND='/usr/local/bin/quest _prompt "$PWD" "$?" "$(umask)"'
+alias ll='ls -l'
+cd /home/learner

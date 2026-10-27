@@ -1,0 +1,9 @@
+#!/usr/bin/env python3
+"""Source checkout launcher; installing the package is optional."""
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
+from linux_quest.app import main
+
+main()

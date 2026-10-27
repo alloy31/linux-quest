@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "linux-quest"
+version = "0.1.0"
+description = "리눅스마스터 2급을 위한 실제 Linux CLI 학습 게임"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+linux-quest = "linux_quest.app:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+linux_quest = ["assets/*", "assets/docker/*"]

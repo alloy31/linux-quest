@@ -60,6 +60,11 @@ class Game:
         self.settings = settings
         self.image_ready = False
 
+    def complete_mission(self, mission):
+        index = MISSIONS.index(mission)
+        next_mission = MISSIONS[index+1].id if index+1 < len(MISSIONS) else None
+        self.progress.complete(mission, next_mission=next_mission)
+
     def difficulty(self):
         return self.ui.menu("난이도를 선택하세요", [(key, value + " — " + info) for key, value, info in (
             ("beginner", "초급", "개념·명령어와 함께"),
@@ -270,13 +275,10 @@ class Game:
                 self.ui.pause("Enter를 누르면 틀린 문제에 다시 도전합니다.")
                 while not self.practice_question(q, position=(index, len(wrong)), context="오답 다시 풀기")[0]:
                     self.ui.pause("브리핑과 해설을 보고 Enter를 누르면 다시 도전합니다.")
-        self.progress.complete(mission)
+        self.complete_mission(mission)
         return self.after_mission(mission)
 
     def after_mission(self, mission):
-        index = MISSIONS.index(mission)
-        self.progress.data["cursor"] = MISSIONS[index+1].id if index+1 < len(MISSIONS) else None
-        self.progress.save()
         self.ui.panel("✓ 미션 완료", self.progress.rank() + ("\n" + mission.debrief if mission.debrief else ""), "success")
         if mission.clue:
             self.ui.section("사건 기록", "hint")
@@ -310,6 +312,7 @@ class Game:
                         self.image_ready = True
                     with DockerLab(mission.network, color=self.ui.color) as lab:
                         lab.setup(mission.setup.replace("{v}", variant))
+                        lab.track_changes()
                         first_prompt = True
                         previous_unmet = None
 
@@ -346,12 +349,18 @@ class Game:
                             elif command == "help":
                                 self.ui.lab_help()
                                 self.ui.text("조사 답변 quest answer 값 · 개념 보기 quest lesson", "muted", indent=2)
+                            elif command == "diff":
+                                self.ui.changes(active.last_changes)
                             if command not in ("_prompt", "check", "answer"):
                                 return None
+                            changes = active.track_changes()
+                            if changes:
+                                self.ui.changes(changes)
                             result = active.check(mission.conditions(difficulty, variant))
                             if result.success:
                                 self.ui.text("\n✓ 모든 완료 조건을 충족했습니다.", "success")
-                                self.progress.complete(mission)
+                                self.complete_mission(mission)
+                                self.ui.pause("실행 결과와 변경 내용을 확인한 뒤 Enter를 누르면 확인 문제로 이동합니다.")
                                 pool = [q for q in QUESTIONS if q.id in MISSION_QUESTIONS.get(mission.id, ())]
                                 if not pool:
                                     pool = [q for q in QUESTIONS if q.topic in mission.topics]

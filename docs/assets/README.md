@@ -5,6 +5,7 @@
 | `linux-quest-cover.png` | built-in `image_gen`으로 생성한 소개용 픽셀 아트. 생성 결과를 변형 없이 저장했습니다. |
 | `start-screen.png` | 실제 CLI를 PTY에서 실행해 받은 ANSI 출력을 PNG로 렌더링했습니다. |
 | `first-mission.png` | 실제 Docker 실습의 첫 미션 출력을 같은 방식으로 렌더링했습니다. |
+| `changes-preview.png` | 실제 `sed` 편집 후의 diff와 결과 확인 화면을 캡처했습니다. |
 
 메인 화면은 선택된 1번 슬랜트 로고와 오른쪽 펭귄, 회색 `made by alloy` 크레딧을 보여줍니다.
 실행 화면 이미지는 가상의 UI 문구를 합성한 목업이 아닌 프로그램의 실제 출력입니다. 터미널 창 장식과 색상 팔레트는 문서용으로 렌더링했습니다.

@@ -20,6 +20,44 @@ class DockerIntegrationTests(unittest.TestCase):
             if kind == "event":
                 lab.apply_event(value)
 
+    def test_read_only_grep_and_real_file_changes(self):
+        mission = MISSION_BY_ID["03-search"]
+        with DockerLab() as lab:
+            lab.setup(mission.setup.replace("{v}", "a"))
+            self.assertFalse(lab.track_changes())
+            output = lab.run("grep ERROR ~/logs_a/system.log").stdout
+            self.assertIn("ERROR permission", output)
+            self.assertFalse(lab.track_changes())
+            lab.run("grep ERROR ~/logs_a/system.log > ~/logs_a/errors.txt")
+            report = lab.track_changes()
+            created = next(change for change in report.files if change.path.endswith("errors.txt"))
+            self.assertEqual(created.status, "생성")
+            self.assertIn("+ERROR disk", created.lines)
+            lab.run("sed -i 's/ERROR disk/ERROR storage/' ~/logs_a/errors.txt")
+            modified = lab.track_changes().files[0]
+            self.assertIn("-ERROR disk", modified.lines)
+            self.assertIn("+ERROR storage", modified.lines)
+            lab.run("chmod 600 ~/logs_a/errors.txt")
+            self.assertIn("권한: 0644 → 0600", lab.track_changes().files[0].details)
+            lab.run("rm ~/logs_a/errors.txt")
+            self.assertEqual(lab.track_changes().files[0].status, "삭제")
+
+    def test_snapshot_does_not_follow_symlinks_or_open_fifos(self):
+        with DockerLab() as lab:
+            lab.setup("")
+            lab.run("ln -s /etc/passwd ~/external; mkfifo ~/channel")
+            snapshot = lab.snapshot()
+            self.assertEqual(snapshot["files"]["/home/learner/external"]["kind"], "symlink")
+            self.assertEqual(snapshot["files"]["/home/learner/external"]["target"], "/etc/passwd")
+            self.assertNotIn("text", snapshot["files"]["/home/learner/external"])
+            self.assertEqual(snapshot["files"]["/home/learner/channel"]["kind"], "special")
+            self.assertNotIn("/etc/passwd", snapshot["files"])
+            lab.run("python3 -c \"open('/home/learner/large', 'w').write('가'*4000)\"")
+            large = lab.snapshot()["files"]["/home/learner/large"]
+            self.assertTrue(large["truncated"])
+            self.assertIsNotNone(large["text"])
+            self.assertLessEqual(len(large["text"].encode()), 8192)
+
     def test_every_lab_difficulty_and_variant_is_solvable_and_not_precompleted(self):
         for mission in MISSIONS:
             if mission.kind == "scenario":

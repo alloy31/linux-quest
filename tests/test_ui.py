@@ -5,9 +5,20 @@ from contextlib import redirect_stdout
 from unittest.mock import patch
 
 from linux_quest.ui import ANSI, BANNER, LOGO, UI, cell_width, wrap_cells
+from linux_quest.changes import compare_snapshots
 
 
 class ReadabilityTests(unittest.TestCase):
+    def test_changes_use_added_and_removed_colors(self):
+        report = compare_snapshots({"files": {"file": {"text": "before\n"}}},
+                                   {"files": {"file": {"text": "after\n"}}})
+        output = io.StringIO()
+        with redirect_stdout(output):
+            UI(color="always").changes(report)
+        self.assertIn("\033[31m", output.getvalue())
+        self.assertIn("\033[32m", output.getvalue())
+        self.assertIn("-before", output.getvalue())
+        self.assertIn("+after", output.getvalue())
     def test_selected_logo_is_left_of_penguin_and_fits_standard_terminal(self):
         rows = BANNER.splitlines()
         self.assertEqual(len(rows), len(LOGO.splitlines()))

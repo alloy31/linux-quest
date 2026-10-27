@@ -12,6 +12,7 @@ RUN sed -i '/tsflags=nodocs/d' /etc/yum.conf && \
 COPY quest-helper.py /usr/local/bin/quest
 COPY bashrc /opt/quest/bashrc
 COPY checks.py /opt/quest/checks.py
+COPY snapshot.py /opt/quest/snapshot.py
 COPY demo.spec /tmp/demo.spec
 RUN chmod 755 /usr/local/bin/quest && \
     rpmbuild -bb /tmp/demo.spec && mkdir -p /opt/quest/packages /opt/quest-network && \

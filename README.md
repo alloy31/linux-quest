@@ -66,6 +66,12 @@ cd /srv/archive/team
 명령이 끝나면 완료 조건을 자동으로 확인합니다. 같은 결과를 만드는 다른 풀이도 인정합니다.
 조건이 남아 있으면 무엇을 더 해결해야 하는지 표시합니다. 편집기 사용 중에는 채점 화면이 끼어들지 않습니다.
 
+`grep` 같은 조회 명령의 출력은 터미널에 남습니다. 파일을 생성·수정·삭제하면 변경 전후를
+미리 보여주며, 추가된 줄은 초록색, 삭제된 줄은 빨간색으로 구분합니다. 권한·소유자·환경변수
+변경도 확인할 수 있습니다. 미션을 해결해도 **결과를 읽고 Enter를 누른 뒤** 확인 문제로 넘어갑니다.
+
+![실제 CLI 출력: 파일 수정 전후 diff와 결과 확인 대기](docs/assets/changes-preview.png)
+
 | 난이도 | 진행 방식 |
 | --- | --- |
 | 초급 | 필요한 개념과 명령어 예시를 보며 작은 목표부터 해결합니다. |
@@ -82,6 +88,7 @@ cd /srv/archive/team
 | `quest mission` | 현재 목표 보기 |
 | `quest hint` | 개념 → 도구 → 풀이 순서의 3단계 힌트 |
 | `quest check` | 바로 채점하고 남은 조건 확인 |
+| `quest diff` | 가장 최근에 감지한 변경 다시 보기 |
 | `quest answer 값` | 조사한 정보 제출 |
 | `quest lesson` | 관련 개념 전체 보기 |
 | `quest reset` | 현재 실습을 초기 상태로 다시 시작 |
@@ -90,6 +97,8 @@ cd /srv/archive/team
 | `Ctrl+]` | 명령 실행 중에도 게임 메뉴 열기 |
 
 `Ctrl+C`는 실행 중인 셸 작업을 중단합니다. 셸이나 Docker 연결이 종료되면 재시도·건너뛰기·메뉴를 선택할 수 있습니다.
+파일 변경 미리보기는 실습 작업 경로(`/home/learner`, `/srv/archive`, `/srv/backup`)를 대상으로 합니다.
+큰 파일·많은 변경은 표시 범위를 제한하고 생략 여부를 안내합니다.
 
 ## 학습 구성
 
@@ -184,6 +193,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests -v
 
 오류나 개선 아이디어는 [Issues](https://github.com/alloy31/linux-quest/issues)에 남겨주세요.
 사용한 OS·Python·Docker 버전, 실행한 명령과 재현 순서를 함께 적으면 확인에 도움이 됩니다.
+이 저장소의 수정은 새 브랜치에서 작업하고, 관련 검사와 CI를 확인한 PR을 머지하는 방식으로 진행합니다.
 
 학습 기준은 [KAIT 시험 안내·출제기준](https://www.ihd.or.kr/introducesubject1.do)입니다.
 2027년 이후 시험에는 변경된 출제 환경을 별도로 확인해야 합니다.

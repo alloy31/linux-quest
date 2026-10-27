@@ -6,9 +6,9 @@ import os
 import sys
 
 command = sys.argv[1] if len(sys.argv) > 1 else "help"
-allowed = ("mission", "hint", "check", "reset", "skip", "exit", "answer", "lesson", "help", "_prompt")
+allowed = ("mission", "hint", "check", "diff", "reset", "skip", "exit", "answer", "lesson", "help", "_prompt")
 if command not in allowed:
-    print("quest mission | hint | check | reset | skip | exit | answer 답 | lesson")
+    print("quest mission | hint | check | diff | reset | skip | exit | answer 답 | lesson")
     sys.exit(2)
 body = {"command": command, "args": sys.argv[2:]}
 if command == "_prompt":

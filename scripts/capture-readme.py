@@ -166,6 +166,23 @@ def main():
             terminal.wait()
         finally:
             terminal.close()
+        terminal = Terminal(tmp, "--mission", "07-edit", width=80, height=36, color=None)
+        try:
+            terminal.expect(":~$ ")
+            terminal.send("printf '\\033[2J\\033[H'\r")
+            terminal.expect(":~$ ")
+            terminal.send("sed -i 's@/tmp/wrong@/srv/backup@' ~/backup_*.conf\r")
+            terminal.expect("실행 결과와 변경 내용을 확인한 뒤 Enter")
+            render(bytes(terminal.transcript), ROOT / "docs/assets/changes-preview.png",
+                   "linux-quest / changes preview", args.mono_font, args.cjk_font)
+            terminal.send("\r")
+            terminal.expect("s 해설 보기:")
+            terminal.send("s\r")
+            terminal.expect("m 메인 메뉴:")
+            terminal.send("m\r")
+            terminal.wait()
+        finally:
+            terminal.close()
         terminal = Terminal(tmp, "--mission", "01-arrival", width=80, height=36, color=None)
         try:
             terminal.expect(":~$ ")

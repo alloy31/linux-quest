@@ -15,6 +15,7 @@ import tty
 from pathlib import Path
 
 from .model import CheckResult
+from .changes import ChangeReport, compare_snapshots
 
 IMAGE = "linux-quest:2026.1"
 ASSETS = Path(__file__).parent / "assets/docker"
@@ -115,6 +116,9 @@ class DockerLab:
         self.context = {"cwd": "/home/learner", "env": {}, "umask": "0022", "answer": ""}
         self.created = False
         self.process = None
+        self.previous_snapshot = None
+        self.previous_context = None
+        self.last_changes = ChangeReport()
 
     def __enter__(self):
         try:
@@ -186,6 +190,22 @@ else:
             return CheckResult(data["success"], data["unmet"])
         except (ValueError, KeyError) as exc:
             raise LabError("채점 결과를 읽지 못했습니다. 미션을 다시 시작해 주세요.") from exc
+
+    def snapshot(self):
+        result = docker("exec", "--user", "learner", self.name, "python3", "/opt/quest/snapshot.py")
+        try:
+            return json.loads(result.stdout)
+        except ValueError as exc:
+            raise LabError("실습 파일의 변경 상태를 읽지 못했습니다.") from exc
+
+    def track_changes(self):
+        current = self.snapshot()
+        context = {"env": dict(self.context.get("env", {})), "umask": self.context.get("umask")}
+        result = compare_snapshots(self.previous_snapshot, current, self.previous_context, context) if self.previous_snapshot is not None else ChangeReport()
+        self.previous_snapshot, self.previous_context = current, context
+        if result:
+            self.last_changes = result
+        return result
 
     def apply_event(self, event):
         if event["command"] == "_prompt":

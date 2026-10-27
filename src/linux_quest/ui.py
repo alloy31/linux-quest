@@ -49,7 +49,8 @@ COMPACT_BANNER = join_banner("[ LINUX QUEST ]")
 
 ANSI = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 PALETTE = {"accent": "1;36", "command": "1;33", "hint": "1;35", "success": "1;32",
-           "warning": "1;33", "muted": "2", "strong": "1", "selected": "1;36", "credit": "90"}
+           "warning": "1;33", "muted": "2", "strong": "1", "selected": "1;36", "credit": "90",
+           "added": "32", "removed": "31"}
 
 
 def cell_width(text):
@@ -190,6 +191,24 @@ class UI:
         self.print()
         self.text("힌트 quest hint · 목표 quest mission · 채점 quest check", indent=2)
         self.text("초기화 quest reset · 나가기 quest exit · 메뉴 Ctrl+]", "muted", indent=2)
+        self.text("최근 변경 보기 quest diff", "muted", indent=2)
+
+    def changes(self, report):
+        if not report:
+            self.text("아직 기록된 변경이 없습니다. 명령 출력은 실습 터미널에서 확인하세요.", "muted")
+            return
+        self.section("변경 내용")
+        for change in report.files:
+            self.text(f"[{change.status}] {change.path}", "strong")
+            for detail in change.details:
+                self.text(detail, "muted", indent=2)
+            for line in change.lines:
+                tone = "added" if line.startswith("+") else "removed" if line.startswith("-") else "accent" if line.startswith("@@") else None
+                self.text(line, tone, indent=2)
+        for line in report.environment:
+            self.text(line, "command", indent=2)
+        for note in report.notes:
+            self.text(note, "warning", indent=2)
 
     def title(self):
         self.clear()

@@ -93,7 +93,7 @@ class Progress:
         self.save()
         return current["hint"]
 
-    def complete(self, mission):
+    def complete(self, mission, next_mission=None):
         current = self.data["current"]
         record = self.record(mission.id)
         first = not record["completed"]
@@ -111,6 +111,7 @@ class Progress:
         if mission.clue and mission.id not in self.data["clues"]:
             self.data["clues"].append(mission.id)
         self.data["current"] = None
+        self.data["cursor"] = next_mission
         self.save()
         return first
 

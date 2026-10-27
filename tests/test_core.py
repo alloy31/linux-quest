@@ -55,6 +55,14 @@ class ProgressTests(unittest.TestCase):
         self.assertFalse(self.progress.record("later")["completed"])
         self.assertEqual(self.progress.data["xp"], 100)
 
+    def test_completion_saves_next_cursor_before_result_acknowledgement(self):
+        self.progress.begin("test", "beginner", "a")
+        self.progress.complete(self.mission, next_mission="next")
+        resumed = Progress(self.path)
+        self.assertTrue(resumed.record("test")["completed"])
+        self.assertEqual(resumed.data["cursor"], "next")
+        self.assertIsNone(resumed.data["current"])
+
     def test_corrupt_save_is_preserved(self):
         self.path.write_text("broken", encoding="utf-8")
         with self.assertRaises(SaveError):

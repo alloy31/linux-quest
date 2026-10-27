@@ -233,6 +233,51 @@ class MenuTerminalTests(unittest.TestCase):
 
 @unittest.skipUnless(os.environ.get("RUN_DOCKER_TESTS") == "1", "실제 Docker/PTY 검증은 opt-in")
 class GameTerminalTests(unittest.TestCase):
+    def test_grep_output_and_redirected_changes_wait_for_acknowledgement(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            terminal = Terminal(tmp, "--mission", "03-search")
+            try:
+                terminal.expect("learner@quest:~$")
+                saved = json.loads((Path(tmp) / "progress.json").read_text())
+                variant = saved["current"]["variant"]
+                terminal.send(f"grep ERROR ~/logs_{variant}/system.log\r")
+                output = terminal.expect("learner@quest:~$")
+                self.assertIn("ERROR disk", output)
+                self.assertIn("ERROR permission", output)
+                self.assertNotIn("\033[2J", output)
+                terminal.send(f"grep ERROR ~/logs_{variant}/system.log > ~/logs_{variant}/errors.txt\r")
+                report = terminal.expect("실행 결과와 변경 내용을 확인한 뒤 Enter")
+                self.assertIn("[생성]", report)
+                self.assertIn("+ERROR disk", report)
+                self.assertNotIn("\033[2J", report)
+                saved = json.loads((Path(tmp) / "progress.json").read_text())
+                self.assertTrue(saved["missions"]["03-search"]["completed"])
+                self.assertEqual(saved["cursor"], "03-archive")
+                terminal.send("\r")
+                self.assertIn("\033[2J", terminal.expect("s 해설 보기:"))
+                terminal.send("s\r")
+                terminal.expect("m 메인 메뉴:")
+                terminal.send("m\r")
+                self.assertEqual(terminal.wait(), 0)
+            finally:
+                terminal.close()
+
+    def test_result_pause_preserves_completed_mission_when_interrupted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            terminal = Terminal(tmp, "--mission", "01-arrival")
+            try:
+                terminal.expect("learner@quest:~$")
+                terminal.send("cd /srv/archive/team\r")
+                terminal.expect("실행 결과와 변경 내용을 확인한 뒤 Enter")
+                terminal.proc.send_signal(signal.SIGINT)
+                self.assertEqual(terminal.wait(), 0)
+                saved = json.loads((Path(tmp) / "progress.json").read_text())
+                self.assertTrue(saved["missions"]["01-arrival"]["completed"])
+                self.assertEqual(saved["cursor"], "01-observe")
+                self.assertIsNone(saved["current"])
+            finally:
+                terminal.close()
+
     def test_full_start_hint_reset_persistent_shell_auto_check_and_resume(self):
         with tempfile.TemporaryDirectory() as tmp:
             terminal = Terminal(tmp)
@@ -265,6 +310,8 @@ class GameTerminalTests(unittest.TestCase):
                 self.assertEqual(saved["current"]["hint"], 1)
                 terminal.send("cd /srv/archive/team\r")
                 terminal.expect("✓ 모든 완료 조건")
+                terminal.expect("실행 결과와 변경 내용을 확인한 뒤 Enter")
+                terminal.send("\r")
                 terminal.expect("s 해설 보기:")
                 terminal.send("s\r")
                 terminal.expect("m 메인 메뉴:")
@@ -314,9 +361,17 @@ class GameTerminalTests(unittest.TestCase):
                 terminal.send(b"gg0Cdestination=/srv/backup\x1b")
                 self.assertEqual(json.loads((Path(tmp) / "progress.json").read_text())["xp"], 0)
                 terminal.send(":wq\r")
-                terminal.expect("learner@quest:~$")
+                changes = terminal.expect("learner@quest:~$")
+                self.assertIn("-destination=/tmp/wrong", changes)
+                self.assertIn("+destination=/srv/backup", changes)
+                terminal.send("quest diff\r")
+                repeated = terminal.expect("learner@quest:~$")
+                self.assertIn("-destination=/tmp/wrong", repeated)
+                self.assertIn("+destination=/srv/backup", repeated)
                 terminal.send(f"chmod 640 ~/backup_{variant}.conf; export BACKUP_TARGET=/srv/backup\r")
                 terminal.expect("✓ 모든 완료 조건")
+                terminal.expect("실행 결과와 변경 내용을 확인한 뒤 Enter")
+                terminal.send("\r")
                 terminal.expect("s 해설 보기:")
                 terminal.send("s\r")
                 terminal.expect("m 메인 메뉴:")

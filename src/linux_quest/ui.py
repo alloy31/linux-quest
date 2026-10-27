@@ -67,7 +67,7 @@ def raw_input():
 
 
 class UI:
-    def __init__(self, color="auto"):
+    def __init__(self, color="always"):
         self.interactive = sys.stdin.isatty() and sys.stdout.isatty() and os.environ.get("TERM") != "dumb"
         self.color = color == "always" or (color == "auto" and self.interactive and "NO_COLOR" not in os.environ)
 

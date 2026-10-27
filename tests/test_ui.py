@@ -30,9 +30,9 @@ class ReadabilityTests(unittest.TestCase):
 
     def test_explicit_color_overrides_no_color_but_auto_honors_it(self):
         with patch.dict(os.environ, {"NO_COLOR": "1"}):
-            ui = UI()
+            ui = UI(color="auto")
             self.assertNotIn("\033[", ui.paint("목표"))
-            ui = UI(color="always")
+            ui = UI()
             styled = ui.paint("목표")
             self.assertIn("\033[", styled)
             self.assertEqual(ANSI.sub("", styled), "목표")

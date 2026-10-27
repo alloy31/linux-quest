@@ -19,11 +19,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class Terminal:
-    def __init__(self, data_dir, *args, width=90, height=32):
+    def __init__(self, data_dir, *args, width=90, height=32, color="never"):
         self.fd, slave = pty.openpty()
         fcntl.ioctl(self.fd, termios.TIOCSWINSZ, struct.pack("HHHH", height, width, 0, 0))
         self.proc = subprocess.Popen([sys.executable, str(ROOT / "linux-quest"),
-            "--data-dir", str(data_dir), *args], stdin=slave, stdout=slave, stderr=slave,
+            "--data-dir", str(data_dir), *(["--color", color] if color else []), *args], stdin=slave, stdout=slave, stderr=slave,
             cwd=ROOT, env={**os.environ, "TERM": "xterm-256color", "NO_COLOR": "1"},
             start_new_session=True)
         os.close(slave)
@@ -100,9 +100,9 @@ class MenuTerminalTests(unittest.TestCase):
             finally:
                 terminal.close()
 
-    def test_force_color_displays_style_when_no_color_is_inherited(self):
+    def test_default_launch_is_colored_even_when_no_color_is_inherited(self):
         with tempfile.TemporaryDirectory() as tmp:
-            terminal = Terminal(tmp, "--color", "always")
+            terminal = Terminal(tmp, color=None)
             try:
                 screen = terminal.expect("숫자+Enter")
                 self.assertIn("\033[1;36m", screen)

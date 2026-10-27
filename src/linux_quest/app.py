@@ -469,7 +469,7 @@ def main():
     parser.add_argument("--mission", choices=list(MISSION_BY_ID), help="지정 미션으로 바로 시작")
     parser.add_argument("--difficulty", choices=list(DIFFICULTIES), default="beginner")
     parser.add_argument("--exam", type=int, choices=(1, 2), help="모의시험 바로 시작")
-    parser.add_argument("--color", choices=("auto", "always", "never"), default="auto", help="색상 표시 방식")
+    parser.add_argument("--color", choices=("auto", "always", "never"), default="always", help="색상 표시 방식 (기본: always)")
     args = parser.parse_args()
     ui = UI(color=args.color)
     if args.check_content:

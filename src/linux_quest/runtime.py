@@ -109,7 +109,7 @@ class DockerLab:
                     "--cpus", "0.5", "--pids-limit", "64", "--cap-drop", "ALL",
                     "--security-opt", "no-new-privileges:true", "--workdir", "/opt/quest-network",
                     IMAGE, "python3", "-m", "http.server", "8080")
-            docker("run", "-d", "--name", self.name, "--label", "org.linux-quest.managed=true",
+            docker("run", "-d", "--init", "--name", self.name, "--label", "org.linux-quest.managed=true",
                 "--network", self.netname if self.network else "none", "--memory", "512m",
                 "--cpus", "1", "--pids-limit", "128", "--hostname", "quest", IMAGE)
             self.created = True
@@ -158,6 +158,14 @@ class DockerLab:
         except (ValueError, KeyError) as exc:
             raise LabError("채점 결과를 읽지 못했습니다. 미션을 다시 시작해 주세요.") from exc
 
+    def apply_event(self, event):
+        if event["command"] == "_prompt":
+            args = event.get("args", [])
+            if len(args) >= 3:
+                self.context.update(cwd=args[0], umask=args[2], env=event.get("env", {}))
+        elif event["command"] == "answer":
+            self.context["answer"] = " ".join(event.get("args", []))
+
     def interact(self, handler):
         """Full PTY relay: never interprets learner command strings on the host."""
         if not sys.stdin.isatty():
@@ -201,12 +209,7 @@ class DockerLab:
                         if kind == "output":
                             os.write(sys.stdout.fileno(), value)
                             continue
-                        if value["command"] == "_prompt":
-                            args = value.get("args", [])
-                            if len(args) >= 3:
-                                self.context.update(cwd=args[0], umask=args[2], env=value.get("env", {}))
-                        elif value["command"] == "answer":
-                            self.context["answer"] = " ".join(value.get("args", []))
+                        self.apply_event(value)
                         termios.tcsetattr(fd, termios.TCSADRAIN, old)
                         try:
                             action = handler(value, self)
@@ -226,6 +229,7 @@ class DockerLab:
                             tty.setraw(fd)
                         if action:
                             return action
+                        os.write(master, b"\x0c")
                         continue
                     os.write(master, key)
                 if self.process.poll() is not None and not ready:

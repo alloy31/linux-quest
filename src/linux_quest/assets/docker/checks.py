@@ -64,7 +64,7 @@ for goal in payload["goals"]:
             else:
                 ok = alive and os.getpriority(os.PRIO_PROCESS, pid) == int(expected)
         elif kind == "archive":
-            with tarfile.open(path) as archive:
+            with tarfile.open(path, "r:gz" if path.endswith(".gz") else "r") as archive:
                 wanted = goal["members"]
                 names = [name.lstrip("./") for name in archive.getnames()]
                 ok = all(name in names for name in wanted)

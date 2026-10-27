@@ -206,7 +206,8 @@ class MenuTerminalTests(unittest.TestCase):
             terminal = Terminal(tmp)
             try:
                 transcript = terminal.expect("숫자+Enter")
-                self.assertIn("Q U E S T", transcript)
+                self.assertIn("/ __ \\/", transcript)
+                self.assertIn("|o_o |", transcript)
                 self.assertIn("made by alloy", transcript)
                 self.assertIn("이어하기 (기록 없음)", transcript)
                 # A pasted arrow sequence plus Enter must not be discarded by raw-mode setup.

@@ -10,12 +10,42 @@ import unicodedata
 from contextlib import contextmanager
 
 
-BANNER = r""" _     ___ _   _ _   ___  __
-| |   |_ _| \ | | | | \ \/ /
-| |    | ||  \| | | | |\  /
-| |___ | || |\  | |_| |/  \
-|_____|___|_| \_|\___//_/\_\
-          Q U E S T"""
+LOGO = r"""    __    _____   ____  ___  __
+   / /   /  _/ | / / / / / |/ /
+  / /    / //  |/ / / / /|   /
+ / /____/ // /|  / /_/ //   |
+/_____/___/_/ |_/\____//_/|_|
+
+   ____  __  __________________
+  / __ \/ / / / ____/ ___/_  __/
+ / / / / / / / __/  \__ \ / /
+/ /_/ / /_/ / /___ ___/ // /
+\___\_\____/_____//____//_/"""
+
+PENGUIN = r"""    .--.
+   |o_o |
+   |:_/ |
+  //   \ \
+ (|     | )
+/'\_   _/'\
+\___)=(___/"""
+
+
+def join_banner(logo, mascot=PENGUIN, gap=4):
+    left, right = logo.splitlines(), mascot.splitlines()
+    width = max(map(len, left))
+    height = max(len(left), len(right))
+    left_top, right_top = (height-len(left))//2, (height-len(right))//2
+    rows = []
+    for i in range(height):
+        a = left[i-left_top] if left_top <= i < left_top+len(left) else ""
+        b = right[i-right_top] if right_top <= i < right_top+len(right) else ""
+        rows.append((a.ljust(width) + " " * gap + b).rstrip())
+    return "\n".join(rows)
+
+
+BANNER = join_banner(LOGO)
+COMPACT_BANNER = join_banner("[ LINUX QUEST ]")
 
 ANSI = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 PALETTE = {"accent": "1;36", "command": "1;33", "hint": "1;35", "success": "1;32",
@@ -164,10 +194,18 @@ class UI:
     def title(self):
         self.clear()
         width, height = shutil.get_terminal_size((80, 24))
-        banner = BANNER if width >= 42 and height >= 20 else "[ LINUX QUEST ]"
-        self.print(self.paint(banner, "accent"))
+        available = min(self.width, width-2)
+        if height >= 22 and max(map(len, BANNER.splitlines())) <= available:
+            banner, split = BANNER, max(map(len, LOGO.splitlines())) + 4
+        elif height >= 22 and max(map(len, COMPACT_BANNER.splitlines())) <= available:
+            banner, split = COMPACT_BANNER, len("[ LINUX QUEST ]") + 4
+        else:
+            banner, split = "[ LINUX QUEST ]", len("[ LINUX QUEST ]")
+        for line in banner.splitlines():
+            self.print(self.paint(line[:split], "accent") + self.paint(line[split:], "strong"))
         self.print(self.paint("made by alloy".center(max(cell_width(line) for line in banner.splitlines())), "credit"))
-        self.text("리눅스마스터 2급 · 2026 · Rocky Linux 8", "muted")
+        if height >= 18:
+            self.text("리눅스마스터 2급 · 2026 · Rocky Linux 8", "muted")
         self.print()
 
     def menu(self, title, entries, disabled=(), banner=False, default=None):
@@ -202,7 +240,7 @@ class UI:
                     suffix = " (기록 없음)" if key in disabled else ""
                     line = f"  {marker} {i+1}. {label}{suffix}"
                     self.text(line, "selected" if i == selected else "muted" if key in disabled else None)
-                    if len(entries) <= 6:
+                    if len(entries) <= 6 and (not banner or shutil.get_terminal_size((80, 24)).lines >= 30):
                         self.print()
                 self.text("↑↓ 선택 · Enter 확인 · 숫자+Enter" + (f"  [{digits}]" if digits else ""), "muted")
                 with raw_input():

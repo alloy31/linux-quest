@@ -4,10 +4,32 @@ import unittest
 from contextlib import redirect_stdout
 from unittest.mock import patch
 
-from linux_quest.ui import ANSI, UI, cell_width, wrap_cells
+from linux_quest.ui import ANSI, BANNER, LOGO, UI, cell_width, wrap_cells
 
 
 class ReadabilityTests(unittest.TestCase):
+    def test_selected_logo_is_left_of_penguin_and_fits_standard_terminal(self):
+        rows = BANNER.splitlines()
+        self.assertEqual(len(rows), len(LOGO.splitlines()))
+        face = next(line for line in rows if "|o_o |" in line)
+        self.assertGreater(face.index("|o_o |"), max(map(len, LOGO.splitlines())))
+        self.assertLessEqual(max(map(len, rows)), 60)
+
+    def test_full_start_screen_fits_an_80_by_24_terminal(self):
+        with patch("shutil.get_terminal_size", return_value=os.terminal_size((80, 24))):
+            output = io.StringIO()
+            with redirect_stdout(output):
+                ui = UI(color="never")
+                ui.title()
+                ui.text("기록 보관소에 오신 것을 환영합니다")
+                ui.print("─" * ui.width)
+                ui.print()
+                for label in ("시작하기", "이어하기", "학습 메뉴", "설정", "종료"):
+                    ui.text(label)
+                ui.text("↑↓ 선택 · Enter 확인 · 숫자+Enter")
+            self.assertLessEqual(len(output.getvalue().splitlines()), 24)
+            self.assertIn("|o_o |", output.getvalue())
+
     def test_hangul_combining_marks_and_ansi_have_correct_display_width(self):
         self.assertEqual(cell_width("cd 자료"), 7)
         self.assertEqual(cell_width("\033[33mcd 자료\033[0m"), 7)

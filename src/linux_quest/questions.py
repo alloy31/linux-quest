@@ -4,6 +4,7 @@ Each row is topic ¦ stem ¦ correct answer ¦ three alternatives ¦ explanation
 Choice order is shuffled when displayed; topic identifiers preserve coverage.
 """
 from .model import Question
+from .questions_extra import EXTRA_ROWS
 
 _ROWS = """
 overview¦CPU·메모리·장치를 직접 관리하는 핵심 구성 요소는?¦커널¦브라우저¦텍스트 에디터¦패키지 저장소¦커널은 하드웨어 자원과 프로세스를 관리합니다.
@@ -191,7 +192,7 @@ _BOTH = {"files", "basics", "users"}
 
 def load_questions():
     counts, questions = {}, []
-    for row in _ROWS.splitlines():
+    for row in (_ROWS + "\n" + EXTRA_ROWS).splitlines():
         topic, stem, correct, a, b, c, explanation = row.split("¦")
         counts[topic] = counts.get(topic, 0) + 1
         stages = (1,) if topic in _FIRST_ONLY else ((1, 2) if topic in _BOTH else (2,))
